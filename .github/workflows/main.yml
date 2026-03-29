@@ -26,10 +26,15 @@ jobs:
 
       - name: Build APK
         run: |
-          # On crée le fichier de config manuellement pour éviter les erreurs de détection automatique
+          # On configure Bubblewrap pour qu'il sache où se trouve Java (JDK)
+          # Cela évite la question qui bloque tout
+          mkdir -p ~/.bubblewrap
+          echo "{\"jdkPath\":\"${JAVA_HOME}\",\"androidSdkPath\":\"/usr/local/lib/android/sdk\"}" > ~/.bubblewrap/config.json
+          
+          # Initialisation
           bubblewrap init --url=${{ github.event.client_payload.url }} --name="${{ github.event.client_payload.name }}" --no-prompt
           
-          # On lance le build en acceptant tout
+          # Compilation (on répond 'yes' à tout par sécurité)
           yes | bubblewrap build --skipSigning
           
       - name: Upload APK
