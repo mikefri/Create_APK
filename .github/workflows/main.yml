@@ -1,0 +1,14 @@
+name: Test de Connexion
+on:
+  repository_dispatch:
+    types: [build-app] # Le signal que ton site va envoyer
+
+jobs:
+  ping-pong:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Message de confirmation
+        run: |
+          echo "Le site web a bien contacté GitHub !"
+          echo "URL à transformer : ${{ github.event.client_payload.url }}"
+          echo "Nom de l'app : ${{ github.event.client_payload.name }}"
