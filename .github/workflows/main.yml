@@ -1,14 +1,41 @@
-name: Test de Connexion
+name: Build APK from WebApp
 on:
   repository_dispatch:
-    types: [build-app] # Le signal que ton site va envoyer
+    types: [build-app]
 
 jobs:
-  ping-pong:
+  build:
     runs-on: ubuntu-latest
     steps:
-      - name: Message de confirmation
+      - name: Checkout du code
+        uses: actions/checkout@v4
+
+      - name: Installation de Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Installer Bubblewrap CLI
+        run: npm install -g @bubblewrap/cli
+
+      - name: Initialiser et Compiler
         run: |
-          echo "Le site web a bien contacté GitHub !"
-          echo "URL à transformer : ${{ github.event.client_payload.url }}"
-          echo "Nom de l'app : ${{ github.event.client_payload.name }}"
+          # 1. On crée le projet Android à partir de l'URL reçue
+          # --no-prompt permet de répondre automatiquement "oui" aux questions
+          bubblewrap init --url=${{ github.event.client_payload.url }} --name="${{ github.event.client_payload.name }}" --no-prompt
+          
+          # 2. On génère l'APK (en mode test non-signé pour l'instant)
+          # On accepte les licences Android automatiquement
+          yes | bubblewrap build
+          
+      - name: Sauvegarder l'APK (Artifact)
+        uses: actions/upload-artifact@v4
+        with:
+          name: application-apk
+          path: ./*.apk
