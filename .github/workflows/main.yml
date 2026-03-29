@@ -26,15 +26,23 @@ jobs:
 
       - name: Compiler l'APK Réel
         run: |
-          # On initialise le projet à partir de l'URL reçue
+          # 1. On crée un dossier pour le projet pour éviter les conflits
+          mkdir android-project && cd android-project
+          
+          # 2. On initialise le projet avec l'URL envoyée par le site
+          # On utilise --no-prompt pour que Bubblewrap choisisse les réglages par défaut
           bubblewrap init --url=${{ github.event.client_payload.url }} --name="${{ github.event.client_payload.name }}" --no-prompt
           
-          # On génère l'APK. 
-          # Note: Sans clé de signature, il va générer un APK "unsigned" (pour test uniquement)
-          bubblewrap build --skipSigning
+          # 3. On accepte les licences Android SDK automatiquement (étape CRUCIALE)
+          # 'yes' simule l'appui sur la touche Entrée pour toutes les questions
+          yes | bubblewrap build --skipSigning
+          
+          # 4. On déplace l'APK généré vers le dossier parent pour qu'il soit trouvé par l'étape suivante
+          mv *.apk ../
           
       - name: Téléverser l'APK final
         uses: actions/upload-artifact@v4
         with:
           name: Mon-Application-APK
           path: ./*.apk
+          if-no-files-found: error # Si aucun APK n'est trouvé, l'action affichera une erreur rouge claire
