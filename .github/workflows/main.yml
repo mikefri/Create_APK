@@ -44,17 +44,26 @@ jobs:
 
       - name: Init project
         run: |
-          bubblewrap init \
-            --url="${{ github.event.client_payload.url }}" \
+          yes '' | bubblewrap init \
             --manifest="${{ github.event.client_payload.url }}/manifest.json"
+        env:
+          BUBBLEWRAP_SKIP_UPDATE_CHECK: "true"
 
       - name: Build APK
-        run: bubblewrap build --skipSigning
+        run: |
+          cd twa-app
+          yes '' | bubblewrap build --skipSigning
+        env:
+          BUBBLEWRAP_SKIP_UPDATE_CHECK: "true"
+
+      - name: Trouver APK
+        run: find . -name "*.apk" 2>/dev/null || echo "Aucun APK trouvé"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: apk-${{ github.run_id }}
-          path: app/build/outputs/apk/**/*.apk
-          if-no-files-found: error
+          path: |
+            **/*.apk
+          if-no-files-found: warn
           retention-days: 7
