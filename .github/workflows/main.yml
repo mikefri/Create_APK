@@ -30,9 +30,7 @@ jobs:
           node-version: '20'
 
       - name: Install Bubblewrap
-        run: |
-          npm install -g @bubblewrap/cli
-          npm install -g @bubblewrap/core
+        run: npm install -g @bubblewrap/cli
 
       - name: Configure Bubblewrap
         run: |
@@ -53,6 +51,37 @@ jobs:
           manifest = f"{url}/manifest.json"
           print(f"Manifest : {manifest}")
 
+          # Réponses à toutes les questions de Bubblewrap dans l'ordre
+          answers = [
+            '\n',        # Domain (valeur du manifest)
+            '\n',        # URL path
+            '\n',        # Application name
+            '\n',        # Short name
+            '\n',        # Theme color
+            '\n',        # Background color
+            '\n',        # Start URL
+            '\n',        # Display mode
+            '\n',        # Status bar
+            '\n',        # Splash screen
+            '\n',        # Orientation
+            '\n',        # Notifications
+            '\n',        # Version
+            '\n',        # Version code
+            '\n',        # Key store location
+            '\n',        # Key name
+            'password123\n',  # Key store password
+            'password123\n',  # Confirm password
+            'Dev User\n',    # First and Last name
+            'Dev\n',         # Organizational unit
+            'MyOrg\n',       # Organization
+            'Paris\n',       # City
+            'IDF\n',         # State
+            'FR\n',          # Country code
+            'yes\n',         # Confirm
+            'password123\n', # Key password
+            'password123\n', # Confirm key password
+          ]
+
           proc = subprocess.Popen(
             ['bubblewrap', 'init', f'--manifest={manifest}'],
             stdin=subprocess.PIPE,
@@ -62,30 +91,35 @@ jobs:
             bufsize=1
           )
 
-          def send_enters():
-            time.sleep(10)
-            for i in range(30):
+          def send_answers():
+            for answer in answers:
+              time.sleep(4)
+              try:
+                proc.stdin.write(answer)
+                proc.stdin.flush()
+                print(f">> Envoyé : {answer.strip() or '(entrée)'}")
+              except:
+                break
+            # Continuer à envoyer des entrées au cas où
+            for i in range(10):
+              time.sleep(3)
               try:
                 proc.stdin.write('\n')
                 proc.stdin.flush()
-                time.sleep(3)
               except:
                 break
 
-          t = threading.Thread(target=send_enters)
+          t = threading.Thread(target=send_answers)
           t.daemon = True
           t.start()
-
           proc.wait()
-          print(f"Code retour : {proc.returncode}")
           PYEOF
         env:
           CLEAN_URL: ${{ github.event.client_payload.url }}
           BUBBLEWRAP_SKIP_UPDATE_CHECK: "true"
 
       - name: Build APK
-        run: |
-          bubblewrap build --skipSigning
+        run: bubblewrap build --skipSigning
         env:
           BUBBLEWRAP_SKIP_UPDATE_CHECK: "true"
 
