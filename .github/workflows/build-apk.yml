@@ -1,0 +1,35 @@
+name: Build APK from WebApp
+on:
+  repository_dispatch:
+    types: [build-app] # Ce déclencheur attend un signal de ton site web
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout du code
+        uses: actions/checkout@v4
+
+      - name: Installation de Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Installer Bubblewrap CLI
+        run: npm install -g @bubblewrap/cli
+
+      - name: Compiler l'APK
+        run: |
+          # Ici, Bubblewrap va transformer l'URL reçue en projet Android
+          # On utilise 'client_payload' pour récupérer l'URL envoyée par le site
+          echo "Construction de l'APK pour : ${{ github.event.client_payload.url }}"
+          
+          # Note : La configuration réelle de Bubblewrap demande des fichiers de clés (Keystore)
+          # Pour ce premier test, on va simuler la réussite de l'étape.
+          echo "Compilation en cours..."
+
+      - name: Téléverser l'APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: mon-application-apk
+          path: ./*.apk # GitHub récupère tous les fichiers .apk générés
