@@ -1,0 +1,22 @@
+name: Build Android APK from WebApp
+on:
+  repository_dispatch:
+    types: [build-app]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install Bubblewrap
+        run: npm install -g @bubblewrap/cli
+
+      # Ici, nous ajouterons les commandes spécifiques pour 
+      # transformer l'URL reçue en projet Android.
