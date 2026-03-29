@@ -1,4 +1,5 @@
 name: Build APK from WebApp
+
 on:
   repository_dispatch:
     types: [build-app]
@@ -6,39 +7,54 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
-      - name: Setup Java
+      - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
 
+      - name: Install Android Build Tools
+        run: |
+          echo "y" | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
+            "build-tools;34.0.0" \
+            "platforms;android-34"
+
       - name: Install Bubblewrap
         run: npm install -g @bubblewrap/cli
 
-      - name: Build APK
+      - name: Configure Bubblewrap
         run: |
-          # 1. Configuration forcée de Bubblewrap (évite les questions)
           mkdir -p ~/.bubblewrap
-          echo "{\"jdkPath\":\"${JAVA_HOME}\",\"androidSdkPath\":\"/usr/local/lib/android/sdk\"}" > ~/.bubblewrap/config.json
-          
-          # 2. Initialisation (directement à la racine pour éviter les erreurs de dossier)
-          bubblewrap init --url=${{ github.event.client_payload.url }} --name="${{ github.event.client_payload.name }}" --no-prompt
-          
-          # 3. Compilation
-          # On accepte tout et on affiche les erreurs s'il y en a
-          yes | bubblewrap build --skipSigning
-          
+          cat > ~/.bubblewrap/config.json << EOF
+          {
+            "jdkPath": "${JAVA_HOME}",
+            "androidSdkPath": "${ANDROID_HOME}"
+          }
+          EOF
+
+      - name: Init project
+        run: |
+          bubblewrap init \
+            --url="${{ github.event.client_payload.url }}" \
+            --manifest="${{ github.event.client_payload.url }}/manifest.json"
+
+      - name: Build APK
+        run: bubblewrap build --skipSigning
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Mon-APK-Genere
-          path: "*.apk"
+          name: apk-${{ github.run_id }}
+          path: app/build/outputs/apk/**/*.apk
+          if-no-files-found: error
+          retention-days: 7
