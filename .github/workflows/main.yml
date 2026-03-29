@@ -12,86 +12,98 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
       - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
 
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
       - name: Install Android Build Tools
         run: |
-          echo "y" | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
-            "build-tools;34.0.0" \
-            "platforms;android-34"
+          sdkmanager "build-tools;34.0.0" "platforms;android-34"
 
-      - name: Install Bubblewrap
-        run: npm install -g @bubblewrap/cli
+      - name: Install Node + Bubblewrap
+        run: |
+          npm install -g @bubblewrap/cli
+          echo "BUBBLEWRAP_SKIP_UPDATE_CHECK=true" >> $GITHUB_ENV
 
       - name: Configure Bubblewrap
         run: |
-          # On affiche le vrai chemin du SDK pour debug
-          echo "ANDROID_HOME = $ANDROID_HOME"
-          echo "ANDROID_SDK_ROOT = $ANDROID_SDK_ROOT"
-          
-          SDK_PATH="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
-          echo "SDK utilisé : $SDK_PATH"
-          
           mkdir -p ~/.bubblewrap
-          cat > ~/.bubblewrap/config.json << EOF
-          {
-            "jdkPath": "${JAVA_HOME}",
-            "androidSdkPath": "${SDK_PATH}"
-          }
-          EOF
-          
+          echo "{\"jdkPath\":\"$JAVA_HOME\",\"androidSdkPath\":\"$ANDROID_SDK_ROOT\"}" \
+            > ~/.bubblewrap/config.json
+          echo "Config Bubblewrap :"
           cat ~/.bubblewrap/config.json
 
-      - name: Install expect
-        run: sudo apt-get install -y expect
-
-      - name: Init project
+      - name: Verifier manifest
         run: |
-          # Nettoyage du slash final pour éviter le double //
           CLEAN_URL="${{ github.event.client_payload.url }}"
           CLEAN_URL="${CLEAN_URL%/}"
-          MANIFEST_URL="${CLEAN_URL}/manifest.json"
-          echo "Manifest URL : $MANIFEST_URL"
+          echo "Manifest URL : ${CLEAN_URL}/manifest.json"
+          curl -fsSL "${CLEAN_URL}/manifest.json" | head -50
 
-          expect -c "
-            set timeout 180
-            spawn bubblewrap init --manifest=\"${MANIFEST_URL}\"
-            expect \"? Domain:\"              { send \"\r\" }
-            expect \"? URL path:\"            { send \"\r\" }
-            expect \"? Application name:\"    { send \"\r\" }
-            expect \"? Short name:\"          { send \"\r\" }
-            expect \"? Theme color:\"         { send \"\r\" }
-            expect \"? Background color:\"    { send \"\r\" }
-            expect \"? Start URL:\"           { send \"\r\" }
-            expect \"? Display mode:\"        { send \"\r\" }
-            expect \"? Status bar:\"          { send \"\r\" }
-            expect \"? Splash screen:\"       { send \"\r\" }
-            expect \"? Orientation:\"         { send \"\r\" }
-            expect \"? Enable notifications:\" { send \"\r\" }
-            expect \"? Version:\"             { send \"\r\" }
-            expect \"? Version code:\"        { send \"\r\" }
-            expect eof
-          "
+      - name: Init project via Node script
+        run: |
+          CLEAN_URL="${{ github.event.client_payload.url }}"
+          CLEAN_URL="${CLEAN_URL%/}"
+
+          node << EOF
+          const { TwaManifest } = require('@bubblewrap/core');
+          const path = require('path');
+
+          async function main() {
+            const manifestUrl = new URL('${CLEAN_URL}/manifest.json');
+            console.log('Chargement manifest depuis :', manifestUrl.toString());
+            const twaManifest = await TwaManifest.fromWebManifestJson(
+              manifestUrl,
+              await (await fetch(manifestUrl.toString())).json()
+            );
+            console.log('Manifest chargé avec succès');
+          }
+          main().catch(e => { console.error(e); process.exit(1); });
+          EOF
+
+      - name: Init Bubblewrap
+        run: |
+          CLEAN_URL="${{ github.event.client_payload.url }}"
+          CLEAN_URL="${CLEAN_URL%/}"
+          
+          # Utilise le wrapper Python pour répondre automatiquement
+          python3 << 'PYEOF'
+          import subprocess, sys, time, os
+
+          proc = subprocess.Popen(
+            ['bubblewrap', 'init', f'--manifest={os.environ["CLEAN_URL"]}/manifest.json'],
+            stdin=subprocess.PIPE,
+            stdout=sys.stdout,
+            stderr=sys.stderr,
+            text=True
+          )
+          
+          time.sleep(30)
+          # Envoie 20 fois Entrée pour répondre à toutes les questions
+          for i in range(20):
+            try:
+              proc.stdin.write('\n')
+              proc.stdin.flush()
+              time.sleep(2)
+            except:
+              break
+          
+          proc.wait()
+          sys.exit(proc.returncode)
+          PYEOF
         env:
-          BUBBLEWRAP_SKIP_UPDATE_CHECK: "true"
+          CLEAN_URL: ${{ github.event.client_payload.url }}
 
       - name: Build APK
-        run: |
-          yes '' | bubblewrap build --skipSigning
-        env:
-          BUBBLEWRAP_SKIP_UPDATE_CHECK: "true"
+        run: bubblewrap build --skipSigning
 
       - name: Trouver APK
-        run: find . -name "*.apk" 2>/dev/null || echo "Aucun APK trouvé"
+        run: find . -name "*.apk" || echo "Aucun APK trouvé"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
