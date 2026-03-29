@@ -15,8 +15,8 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Setup Java
-        uses: actions/setup-java@v3
+      - name: Setup Java (Requis pour Android)
+        uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
@@ -24,18 +24,17 @@ jobs:
       - name: Installer Bubblewrap CLI
         run: npm install -g @bubblewrap/cli
 
-      - name: Initialiser et Compiler
+      - name: Compiler l'APK Réel
         run: |
-          # 1. On crée le projet Android à partir de l'URL reçue
-          # --no-prompt permet de répondre automatiquement "oui" aux questions
+          # On initialise le projet à partir de l'URL reçue
           bubblewrap init --url=${{ github.event.client_payload.url }} --name="${{ github.event.client_payload.name }}" --no-prompt
           
-          # 2. On génère l'APK (en mode test non-signé pour l'instant)
-          # On accepte les licences Android automatiquement
-          yes | bubblewrap build
+          # On génère l'APK. 
+          # Note: Sans clé de signature, il va générer un APK "unsigned" (pour test uniquement)
+          bubblewrap build --skipSigning
           
-      - name: Sauvegarder l'APK (Artifact)
+      - name: Téléverser l'APK final
         uses: actions/upload-artifact@v4
         with:
-          name: application-apk
+          name: Mon-Application-APK
           path: ./*.apk
