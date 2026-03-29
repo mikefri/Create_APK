@@ -7,42 +7,33 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout du code
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Installation de Node.js
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
-      - name: Setup Java (Requis pour Android)
+      - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Installer Bubblewrap CLI
+      - name: Install Bubblewrap
         run: npm install -g @bubblewrap/cli
 
-      - name: Compiler l'APK Réel
+      - name: Build APK
         run: |
-          # 1. On crée un dossier pour le projet pour éviter les conflits
-          mkdir android-project && cd android-project
-          
-          # 2. On initialise le projet avec l'URL envoyée par le site
-          # On utilise --no-prompt pour que Bubblewrap choisisse les réglages par défaut
+          # On crée le fichier de config manuellement pour éviter les erreurs de détection automatique
           bubblewrap init --url=${{ github.event.client_payload.url }} --name="${{ github.event.client_payload.name }}" --no-prompt
           
-          # 3. On accepte les licences Android SDK automatiquement (étape CRUCIALE)
-          # 'yes' simule l'appui sur la touche Entrée pour toutes les questions
+          # On lance le build en acceptant tout
           yes | bubblewrap build --skipSigning
           
-          # 4. On déplace l'APK généré vers le dossier parent pour qu'il soit trouvé par l'étape suivante
-          mv *.apk ../
-          
-      - name: Téléverser l'APK final
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Mon-Application-APK
+          name: App-Release
           path: ./*.apk
-          if-no-files-found: error # Si aucun APK n'est trouvé, l'action affichera une erreur rouge claire
