@@ -34,38 +34,53 @@ jobs:
 
       - name: Configure Bubblewrap
         run: |
+          # On affiche le vrai chemin du SDK pour debug
+          echo "ANDROID_HOME = $ANDROID_HOME"
+          echo "ANDROID_SDK_ROOT = $ANDROID_SDK_ROOT"
+          
+          SDK_PATH="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          echo "SDK utilisé : $SDK_PATH"
+          
           mkdir -p ~/.bubblewrap
           cat > ~/.bubblewrap/config.json << EOF
           {
             "jdkPath": "${JAVA_HOME}",
-            "androidSdkPath": "${ANDROID_HOME}"
+            "androidSdkPath": "${SDK_PATH}"
           }
           EOF
+          
+          cat ~/.bubblewrap/config.json
 
       - name: Install expect
         run: sudo apt-get install -y expect
 
       - name: Init project
         run: |
-          expect -c '
+          # Nettoyage du slash final pour éviter le double //
+          CLEAN_URL="${{ github.event.client_payload.url }}"
+          CLEAN_URL="${CLEAN_URL%/}"
+          MANIFEST_URL="${CLEAN_URL}/manifest.json"
+          echo "Manifest URL : $MANIFEST_URL"
+
+          expect -c "
             set timeout 180
-            spawn bubblewrap init --manifest="${{ github.event.client_payload.url }}/manifest.json"
-            expect "? Domain:"           { send "\r" }
-            expect "? URL path:"         { send "\r" }
-            expect "? Application name:" { send "\r" }
-            expect "? Short name:"       { send "\r" }
-            expect "? Theme color:"      { send "\r" }
-            expect "? Background color:" { send "\r" }
-            expect "? Start URL:"        { send "\r" }
-            expect "? Display mode:"     { send "\r" }
-            expect "? Status bar:"       { send "\r" }
-            expect "? Splash screen:"    { send "\r" }
-            expect "? Orientation:"      { send "\r" }
-            expect "? Enable notifications:" { send "\r" }
-            expect "? Version:"          { send "\r" }
-            expect "? Version code:"     { send "\r" }
+            spawn bubblewrap init --manifest=\"${MANIFEST_URL}\"
+            expect \"? Domain:\"              { send \"\r\" }
+            expect \"? URL path:\"            { send \"\r\" }
+            expect \"? Application name:\"    { send \"\r\" }
+            expect \"? Short name:\"          { send \"\r\" }
+            expect \"? Theme color:\"         { send \"\r\" }
+            expect \"? Background color:\"    { send \"\r\" }
+            expect \"? Start URL:\"           { send \"\r\" }
+            expect \"? Display mode:\"        { send \"\r\" }
+            expect \"? Status bar:\"          { send \"\r\" }
+            expect \"? Splash screen:\"       { send \"\r\" }
+            expect \"? Orientation:\"         { send \"\r\" }
+            expect \"? Enable notifications:\" { send \"\r\" }
+            expect \"? Version:\"             { send \"\r\" }
+            expect \"? Version code:\"        { send \"\r\" }
             expect eof
-          '
+          "
         env:
           BUBBLEWRAP_SKIP_UPDATE_CHECK: "true"
 
