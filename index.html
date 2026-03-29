@@ -2,91 +2,194 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Convertisseur Web vers APK</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web2APK Pro | Générateur</title>
     <style>
-body { 
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-    background-color: #f6f8fa;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 100vh;
-    margin: 0;
-}
-.card {
-    background: white;
-    padding: 30px;
-    border-radius: 12px;
-    box-shadow: 0 8px 24px rgba(149, 157, 165, 0.2);
-    width: 100%;
-    max-width: 400px;
-}
-h1 { color: #24292f; font-size: 24px; text-align: center; }
-input { 
-    width: 100%; 
-    padding: 12px; 
-    margin: 10px 0; 
-    border: 1px solid #d0d7de; 
-    border-radius: 6px; 
-    box-sizing: border-box; /* Pour que le padding ne dépasse pas */
-}
-button { 
-    width: 100%; 
-    background-color: #2da44e; 
-    color: white; 
-    padding: 12px; 
-    border: none; 
-    border-radius: 6px; 
-    font-weight: 600; 
-    cursor: pointer;
-    transition: background 0.2s;
-}
-button:hover { background-color: #2c974b; }
-#status { margin-top: 15px; font-size: 14px; text-align: center; color: #57606a; }
+        :root {
+            --primary: #2da44e;
+            --primary-hover: #2c974b;
+            --bg: #f6f8fa;
+            --text: #24292f;
+            --border: #d0d7de;
+        }
+
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; 
+            background-color: var(--bg);
+            color: var(--text);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+
+        .card {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 450px;
+            box-sizing: border-box;
+        }
+
+        .header { text-align: center; margin-bottom: 30px; }
+        .header h1 { margin: 0; font-size: 26px; color: #1f2328; }
+        .header p { color: #636c76; font-size: 14px; margin-top: 8px; }
+
+        .form-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 8px; font-weight: 600; font-size: 14px; }
+
+        input { 
+            width: 100%; 
+            padding: 12px; 
+            border: 1px solid var(--border); 
+            border-radius: 6px; 
+            box-sizing: border-box;
+            font-size: 14px;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #0969da;
+            box-shadow: 0 0 0 3px rgba(9, 105, 218, 0.1);
+        }
+
+        button { 
+            width: 100%; 
+            background-color: var(--primary); 
+            color: white; 
+            padding: 14px; 
+            border: none; 
+            border-radius: 6px; 
+            font-weight: 600; 
+            font-size: 16px;
+            cursor: pointer;
+            transition: transform 0.1s, background 0.2s;
+            margin-top: 10px;
+        }
+
+        button:hover { background-color: var(--primary-hover); }
+        button:active { transform: scale(0.98); }
+
+        .info-box {
+            background: #f0f7ff;
+            border: 1px solid #c9d1d9;
+            padding: 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            color: #0969da;
+            margin-bottom: 20px;
+        }
+
+        #status { 
+            margin-top: 20px; 
+            padding: 12px;
+            border-radius: 6px;
+            font-size: 14px; 
+            text-align: center; 
+            display: none; 
+        }
+
+        .status-success { display: block !important; background: #dafbe1; color: #1a7f37; border: 1px solid #abe9b8; }
+        .status-error { display: block !important; background: #ffebe9; color: #cf222e; border: 1px solid #ff8182; }
+        .status-loading { display: block !important; background: #fff8c5; color: #9a6700; border: 1px solid #d4a72c; }
     </style>
 </head>
 <body>
-    <h1>Web2APK Generator</h1>
-    <p>Transformez votre PWA en fichier APK via GitHub Actions.</p>
-    
-    <input type="url" id="siteUrl" placeholder="https://votre-pwa.com" required>
-    <input type="text" id="appName" placeholder="Nom de l'App (ex: MonApp)">
-    <input type="password" id="githubToken" placeholder="Votre GitHub Personal Access Token">
-    <p class="info">Le Token est nécessaire pour que le site puisse lancer la compilation sur votre GitHub.</p>
-    
-    <button onclick="lancerCompilation()">Lancer la fabrication</button>
 
-    <div id="status"></div>
+    <div class="card">
+        <div class="header">
+            <h1>Web2APK Pro</h1>
+            <p>Transformez votre site en application Android</p>
+        </div>
+
+        <div class="info-box">
+            ℹ️ Le <b>GitHub Token</b> est requis pour lancer la compilation sur vos serveurs GitHub Actions.
+        </div>
+        
+        <div class="form-group">
+            <label for="siteUrl">URL du site Web (PWA)</label>
+            <input type="url" id="siteUrl" placeholder="https://votre-site.com" required>
+        </div>
+
+        <div class="form-group">
+            <label for="appName">Nom de l'application</label>
+            <input type="text" id="appName" placeholder="Ex: Mon Super Projet">
+        </div>
+
+        <div class="form-group">
+            <label for="githubToken">GitHub Personal Access Token</label>
+            <input type="password" id="githubToken" placeholder="ghp_xxxxxxxxxxxx">
+        </div>
+        
+        <button id="btnBuild" onclick="lancerCompilation()">Lancer la fabrication</button>
+
+        <div id="status"></div>
+    </div>
 
     <script>
         async function lancerCompilation() {
             const url = document.getElementById('siteUrl').value;
+            const appName = document.getElementById('appName').value || "Web2APK-App";
             const token = document.getElementById('githubToken').value;
             const status = document.getElementById('status');
+            const btn = document.getElementById('btnBuild');
 
-            if(!url || !token) return alert("Veuillez remplir l'URL et le Token !");
-
-            status.innerText = "Envoi de la demande à GitHub...";
-
-            // Appel à l'API GitHub pour déclencher le workflow
-            const response = await fetch('https://api.github.com/repos/mikefri/Create_AP/dispatches', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Accept': 'application/vnd.github.v3+json',
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    event_type: 'build-app',
-                    client_payload: { url: url }
-                })
-            });
-
-            if(response.ok) {
-                status.innerText = "✅ C'est parti ! Allez dans l'onglet 'Actions' de votre GitHub pour voir la progression.";
-            } else {
-                status.innerText = "❌ Erreur : Vérifiez votre Token ou le nom du dépôt.";
+            if(!url || !token) {
+                afficherStatut("Veuillez remplir l'URL et le Token !", "error");
+                return;
             }
+
+            // Interface de chargement
+            btn.disabled = true;
+            btn.style.opacity = "0.7";
+            afficherStatut("⏳ Connexion à GitHub en cours...", "loading");
+
+            try {
+                // APPEL API GITHUB (Correction : Create_APK avec un K)
+                const response = await fetch('https://api.github.com/repos/mikefri/Create_APK/dispatches', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        event_type: 'build-app',
+                        client_payload: { 
+                            url: url,
+                            name: appName
+                        }
+                    })
+                });
+
+                if(response.ok) {
+                    afficherStatut("✅ Signal envoyé ! La compilation a démarré dans l'onglet 'Actions' de GitHub.", "success");
+                } else if(response.status === 404) {
+                    afficherStatut("❌ Erreur 404 : Le dépôt ou le Token est incorrect.", "error");
+                } else if(response.status === 401) {
+                    afficherStatut("❌ Erreur 401 : Token invalide ou expiré.", "error");
+                } else {
+                    afficherStatut("❌ Erreur lors de l'envoi. Code : " + response.status, "error");
+                }
+            } catch (err) {
+                afficherStatut("❌ Erreur réseau. Vérifiez votre connexion.", "error");
+            } finally {
+                btn.disabled = false;
+                btn.style.opacity = "1";
+            }
+        }
+
+        function afficherStatut(message, type) {
+            const status = document.getElementById('status');
+            status.innerText = message;
+            status.className = ""; // Reset
+            if(type === "success") status.classList.add("status-success");
+            if(type === "error") status.classList.add("status-error");
+            if(type === "loading") status.classList.add("status-loading");
         }
     </script>
 </body>
