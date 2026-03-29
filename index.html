@@ -11,23 +11,32 @@
     #status { margin-top: 20px; padding: 12px; border-radius: 6px; display: none; }
     .ok  { background: #d4edda; color: #155724; }
     .err { background: #f8d7da; color: #721c24; }
+    label { font-weight: bold; font-size: 14px; color: #333; }
   </style>
 </head>
 <body>
 
   <h2>🚀 Convertir un site en APK Android</h2>
-  <p>Entre l'URL de ton site web (il doit avoir un <strong>manifest.json</strong> valide)</p>
 
+  <label>🔑 Token GitHub</label>
+  <input type="password" id="ghToken" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" />
+
+  <label>🌐 URL du site à convertir</label>
   <input type="url" id="siteUrl" placeholder="https://mon-site.com" />
+
   <button onclick="lancerBuild()">Générer l'APK</button>
 
   <div id="status"></div>
 
 <script>
   async function lancerBuild() {
+    const token = document.getElementById('ghToken').value.trim();
     const url = document.getElementById('siteUrl').value.trim();
-    const status = document.getElementById('status');
 
+    if (!token) {
+      afficher('❌ Entre ton token GitHub', 'err');
+      return;
+    }
     if (!url || !url.startsWith('http')) {
       afficher('❌ Entre une URL valide (commence par https://)', 'err');
       return;
@@ -36,26 +45,23 @@
     afficher('⏳ Envoi en cours...', 'ok');
 
     try {
-      const response = await fetch('https://api.github.com/repos/TON_USERNAME/Create_APK/dispatches', {
+      const response = await fetch('https://api.github.com/repos/mikefri/Create_APK/dispatches', {
         method: 'POST',
         headers: {
-          'Authorization': 'Bearer TON_TOKEN_GITHUB',
+          'Authorization': 'Bearer ' + token,
           'Accept': 'application/vnd.github.v3+json',
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           event_type: 'build-app',
-          client_payload: {
-            url: url,
-            name: 'MonApp'
-          }
+          client_payload: { url: url, name: 'MonApp' }
         })
       });
 
       if (response.status === 204) {
-        afficher('✅ Build lancé ! Va sur GitHub > Actions pour suivre la progression et télécharger ton APK.', 'ok');
+        afficher('✅ Build lancé ! Va sur GitHub > Actions pour suivre et télécharger ton APK.', 'ok');
       } else {
-        afficher('❌ Erreur : ' + response.status + ' — Vérifie ton token GitHub.', 'err');
+        afficher('❌ Erreur ' + response.status + ' — Token invalide ou mauvais username ?', 'err');
       }
     } catch (e) {
       afficher('❌ Erreur réseau : ' + e.message, 'err');
@@ -72,34 +78,3 @@
 
 </body>
 </html>
-```
-
----
-
-## 🔑 Les 2 choses à remplacer dans `index.html`
-
-| Ce que tu vois | Ce que tu mets |
-|---|---|
-| `TON_USERNAME` | Ton pseudo GitHub (ex: `jean123`) |
-| `TON_TOKEN_GITHUB` | Un token GitHub (voir ci-dessous) |
-
----
-
-## 🔐 Créer ton token GitHub (1 minute)
-
-1. Va sur → **github.com > Settings > Developer settings > Personal access tokens > Tokens (classic)**
-2. Clique **"Generate new token"**
-3. Coche uniquement : ✅ `repo`
-4. Copie le token et colle-le dans `index.html`
-
----
-
-## ▶️ Comment ça marche ensuite
-```
-Tu ouvres index.html dans ton navigateur
-        ↓
-Tu entres l'URL de ton site PWA
-        ↓
-GitHub Actions se déclenche automatiquement
-        ↓
-GitHub > ton repo > onglet "Actions" > télécharge l'APK
