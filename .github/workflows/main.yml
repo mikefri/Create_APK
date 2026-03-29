@@ -26,19 +26,19 @@ jobs:
 
       - name: Build APK
         run: |
-          # On configure Bubblewrap pour qu'il sache où se trouve Java (JDK)
-          # Cela évite la question qui bloque tout
+          # 1. Configuration forcée de Bubblewrap (évite les questions)
           mkdir -p ~/.bubblewrap
           echo "{\"jdkPath\":\"${JAVA_HOME}\",\"androidSdkPath\":\"/usr/local/lib/android/sdk\"}" > ~/.bubblewrap/config.json
           
-          # Initialisation
+          # 2. Initialisation (directement à la racine pour éviter les erreurs de dossier)
           bubblewrap init --url=${{ github.event.client_payload.url }} --name="${{ github.event.client_payload.name }}" --no-prompt
           
-          # Compilation (on répond 'yes' à tout par sécurité)
+          # 3. Compilation
+          # On accepte tout et on affiche les erreurs s'il y en a
           yes | bubblewrap build --skipSigning
           
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: App-Release
-          path: ./*.apk
+          name: Mon-APK-Genere
+          path: "*.apk"
