@@ -21,86 +21,73 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install Android Build Tools
-        run: |
-          sdkmanager "build-tools;34.0.0" "platforms;android-34"
+      - name: Install Build Tools
+        run: sdkmanager "build-tools;34.0.0" "platforms;android-34"
 
-      - name: Install Node + Bubblewrap
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Bubblewrap
         run: |
           npm install -g @bubblewrap/cli
-          echo "BUBBLEWRAP_SKIP_UPDATE_CHECK=true" >> $GITHUB_ENV
+          npm install -g @bubblewrap/core
 
       - name: Configure Bubblewrap
         run: |
           mkdir -p ~/.bubblewrap
           echo "{\"jdkPath\":\"$JAVA_HOME\",\"androidSdkPath\":\"$ANDROID_SDK_ROOT\"}" \
             > ~/.bubblewrap/config.json
-          echo "Config Bubblewrap :"
           cat ~/.bubblewrap/config.json
 
-      - name: Verifier manifest
-        run: |
-          CLEAN_URL="${{ github.event.client_payload.url }}"
-          CLEAN_URL="${CLEAN_URL%/}"
-          echo "Manifest URL : ${CLEAN_URL}/manifest.json"
-          curl -fsSL "${CLEAN_URL}/manifest.json" | head -50
-
-      - name: Init project via Node script
+      - name: Init project
         run: |
           CLEAN_URL="${{ github.event.client_payload.url }}"
           CLEAN_URL="${CLEAN_URL%/}"
 
-          node << EOF
-          const { TwaManifest } = require('@bubblewrap/core');
-          const path = require('path');
+          python3 << PYEOF
+          import subprocess, sys, time, os, threading
 
-          async function main() {
-            const manifestUrl = new URL('${CLEAN_URL}/manifest.json');
-            console.log('Chargement manifest depuis :', manifestUrl.toString());
-            const twaManifest = await TwaManifest.fromWebManifestJson(
-              manifestUrl,
-              await (await fetch(manifestUrl.toString())).json()
-            );
-            console.log('Manifest chargé avec succès');
-          }
-          main().catch(e => { console.error(e); process.exit(1); });
-          EOF
-
-      - name: Init Bubblewrap
-        run: |
-          CLEAN_URL="${{ github.event.client_payload.url }}"
-          CLEAN_URL="${CLEAN_URL%/}"
-          
-          # Utilise le wrapper Python pour répondre automatiquement
-          python3 << 'PYEOF'
-          import subprocess, sys, time, os
+          url = os.environ.get('CLEAN_URL', '').rstrip('/')
+          manifest = f"{url}/manifest.json"
+          print(f"Manifest : {manifest}")
 
           proc = subprocess.Popen(
-            ['bubblewrap', 'init', f'--manifest={os.environ["CLEAN_URL"]}/manifest.json'],
+            ['bubblewrap', 'init', f'--manifest={manifest}'],
             stdin=subprocess.PIPE,
             stdout=sys.stdout,
             stderr=sys.stderr,
-            text=True
+            text=True,
+            bufsize=1
           )
-          
-          time.sleep(30)
-          # Envoie 20 fois Entrée pour répondre à toutes les questions
-          for i in range(20):
-            try:
-              proc.stdin.write('\n')
-              proc.stdin.flush()
-              time.sleep(2)
-            except:
-              break
-          
+
+          def send_enters():
+            time.sleep(10)
+            for i in range(30):
+              try:
+                proc.stdin.write('\n')
+                proc.stdin.flush()
+                time.sleep(3)
+              except:
+                break
+
+          t = threading.Thread(target=send_enters)
+          t.daemon = True
+          t.start()
+
           proc.wait()
-          sys.exit(proc.returncode)
+          print(f"Code retour : {proc.returncode}")
           PYEOF
         env:
           CLEAN_URL: ${{ github.event.client_payload.url }}
+          BUBBLEWRAP_SKIP_UPDATE_CHECK: "true"
 
       - name: Build APK
-        run: bubblewrap build --skipSigning
+        run: |
+          bubblewrap build --skipSigning
+        env:
+          BUBBLEWRAP_SKIP_UPDATE_CHECK: "true"
 
       - name: Trouver APK
         run: find . -name "*.apk" || echo "Aucun APK trouvé"
