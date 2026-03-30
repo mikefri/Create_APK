@@ -37,7 +37,19 @@ jobs:
           mkdir -p ~/.bubblewrap
           echo "{\"jdkPath\":\"$JAVA_HOME\",\"androidSdkPath\":\"$ANDROID_SDK_ROOT\"}" \
             > ~/.bubblewrap/config.json
-          cat ~/.bubblewrap/config.json
+
+      # ✅ NOUVEAU : Créer le keystore de signature
+      - name: Create Keystore
+        run: |
+          keytool -genkey -v \
+            -keystore release.keystore \
+            -alias releasekey \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -storepass "${{ secrets.KEYSTORE_PASSWORD }}" \
+            -keypass "${{ secrets.KEY_PASSWORD }}" \
+            -dname "CN=Dev User, OU=Dev, O=MyOrg, L=Paris, S=IDF, C=FR"
 
       - name: Init project
         run: |
@@ -51,35 +63,22 @@ jobs:
           manifest = f"{url}/manifest.json"
           print(f"Manifest : {manifest}")
 
-          # Réponses à toutes les questions de Bubblewrap dans l'ordre
           answers = [
-            '\n',        # Domain (valeur du manifest)
-            '\n',        # URL path
-            '\n',        # Application name
-            '\n',        # Short name
-            '\n',        # Theme color
-            '\n',        # Background color
-            '\n',        # Start URL
-            '\n',        # Display mode
-            '\n',        # Status bar
-            '\n',        # Splash screen
-            '\n',        # Orientation
-            '\n',        # Notifications
-            '\n',        # Version
-            '\n',        # Version code
-            '\n',        # Key store location
-            '\n',        # Key name
-            'password123\n',  # Key store password
-            'password123\n',  # Confirm password
-            'Dev User\n',    # First and Last name
-            'Dev\n',         # Organizational unit
-            'MyOrg\n',       # Organization
-            'Paris\n',       # City
-            'IDF\n',         # State
-            'FR\n',          # Country code
-            'yes\n',         # Confirm
-            'password123\n', # Key password
-            'password123\n', # Confirm key password
+            '\n', '\n', '\n', '\n', '\n', '\n', '\n', '\n', '\n', '\n',
+            '\n', '\n', '\n', '\n',
+            'release.keystore\n',          # Key store location
+            'releasekey\n',                # Key name
+            'password123\n',              # Key store password
+            'password123\n',              # Confirm password
+            'Dev User\n',
+            'Dev\n',
+            'MyOrg\n',
+            'Paris\n',
+            'IDF\n',
+            'FR\n',
+            'yes\n',
+            'password123\n',              # Key password
+            'password123\n',
           ]
 
           proc = subprocess.Popen(
@@ -100,7 +99,6 @@ jobs:
                 print(f">> Envoyé : {answer.strip() or '(entrée)'}")
               except:
                 break
-            # Continuer à envoyer des entrées au cas où
             for i in range(10):
               time.sleep(3)
               try:
@@ -118,18 +116,44 @@ jobs:
           CLEAN_URL: ${{ github.event.client_payload.url }}
           BUBBLEWRAP_SKIP_UPDATE_CHECK: "true"
 
+      # ✅ CORRIGÉ : build SANS --skipSigning
       - name: Build APK
-        run: bubblewrap build --skipSigning
+        run: bubblewrap build
         env:
           BUBBLEWRAP_SKIP_UPDATE_CHECK: "true"
 
-      - name: Trouver APK
-        run: find . -name "*.apk" || echo "Aucun APK trouvé"
+      # ✅ NOUVEAU : Fallback signing si l'APK n'est pas signé
+      - name: Sign APK (fallback)
+        run: |
+          APK=$(find . -name "*.apk" | head -1)
+          if [ -z "$APK" ]; then
+            echo "Aucun APK trouvé"
+            exit 1
+          fi
+
+          # Vérifier si déjà signé
+          if $ANDROID_SDK_ROOT/build-tools/34.0.0/apksigner verify "$APK" 2>/dev/null; then
+            echo "APK déjà signé ✅"
+          else
+            echo "Signature de l'APK..."
+            # Zipalign d'abord
+            $ANDROID_SDK_ROOT/build-tools/34.0.0/zipalign -v 4 "$APK" apk-aligned.apk
+            # Signer
+            $ANDROID_SDK_ROOT/build-tools/34.0.0/apksigner sign \
+              --ks release.keystore \
+              --ks-key-alias releasekey \
+              --ks-pass pass:"${{ secrets.KEYSTORE_PASSWORD }}" \
+              --key-pass pass:"${{ secrets.KEY_PASSWORD }}" \
+              --out apk-signed.apk \
+              apk-aligned.apk
+            echo "APK signé ✅"
+          fi
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: apk-${{ github.run_id }}
-          path: "**/*.apk"
+          path: |
+            **/*.apk
           if-no-files-found: warn
           retention-days: 7
