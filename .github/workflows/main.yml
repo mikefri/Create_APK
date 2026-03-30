@@ -53,9 +53,6 @@ jobs:
 
       - name: Init project
         run: |
-          CLEAN_URL="${{ github.event.client_payload.url }}"
-          CLEAN_URL="${CLEAN_URL%/}"
-
           python3 << PYEOF
           import subprocess, sys, time, os, threading
 
@@ -118,9 +115,6 @@ jobs:
 
       - name: Patch twa-manifest.json with keystore passwords
         run: |
-          echo "=== Contenu twa-manifest.json ==="
-          cat twa-manifest.json
-
           python3 << 'PYEOF'
           import json, os
 
@@ -140,9 +134,55 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
 
       - name: Build APK
-        run: printf "Y\n${{ secrets.KEYSTORE_PASSWORD }}\n${{ secrets.KEY_PASSWORD }}\n" | bubblewrap build
+        run: |
+          python3 << PYEOF
+          import subprocess, sys, time, os, threading
+
+          password_store = os.environ.get('KEYSTORE_PASSWORD', '')
+          password_key   = os.environ.get('KEY_PASSWORD', '')
+
+          # Réponses dans l'ordre des questions de bubblewrap build
+          answers = [
+            'Y\n',                       # There are changes... apply?
+            f'{password_store}\n',       # Password for the Key Store
+            f'{password_key}\n',         # Key Password
+          ]
+
+          proc = subprocess.Popen(
+            ['bubblewrap', 'build'],
+            stdin=subprocess.PIPE,
+            stdout=sys.stdout,
+            stderr=sys.stderr,
+            text=True,
+            bufsize=1
+          )
+
+          def send_answers():
+            for answer in answers:
+              time.sleep(5)
+              try:
+                proc.stdin.write(answer)
+                proc.stdin.flush()
+                print(f">> Envoyé réponse")
+              except:
+                break
+            for i in range(10):
+              time.sleep(3)
+              try:
+                proc.stdin.write('\n')
+                proc.stdin.flush()
+              except:
+                break
+
+          t = threading.Thread(target=send_answers)
+          t.daemon = True
+          t.start()
+          proc.wait()
+          PYEOF
         env:
           BUBBLEWRAP_SKIP_UPDATE_CHECK: "true"
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
 
       - name: Sign APK (fallback si non signé)
         run: |
