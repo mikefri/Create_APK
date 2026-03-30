@@ -4,77 +4,241 @@
   <meta charset="UTF-8">
   <title>Convertir mon site en APK</title>
   <style>
-    body { font-family: Arial, sans-serif; max-width: 600px; margin: 60px auto; padding: 20px; }
-    input { width: 100%; padding: 12px; font-size: 16px; margin: 10px 0; box-sizing: border-box; border: 1px solid #ccc; border-radius: 6px; }
-    button { background: #2ea44f; color: white; border: none; padding: 14px 28px; font-size: 16px; border-radius: 6px; cursor: pointer; width: 100%; }
-    button:hover { background: #22863a; }
-    #status { margin-top: 20px; padding: 12px; border-radius: 6px; display: none; }
-    .ok  { background: #d4edda; color: #155724; }
-    .err { background: #f8d7da; color: #721c24; }
-    label { font-weight: bold; font-size: 14px; color: #333; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; max-width: 620px; margin: 60px auto; padding: 20px; background: #f5f5f5; }
+    .card { background: white; border-radius: 12px; padding: 28px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); }
+    h2 { margin-bottom: 24px; font-size: 20px; }
+    label { display: block; font-weight: bold; font-size: 13px; color: #444; margin-bottom: 6px; }
+    input { width: 100%; padding: 11px 14px; font-size: 15px; margin-bottom: 16px; border: 1px solid #ddd; border-radius: 8px; outline: none; transition: border .2s; }
+    input:focus { border-color: #2ea44f; }
+    button#buildBtn { background: #2ea44f; color: white; border: none; padding: 13px; font-size: 15px; border-radius: 8px; cursor: pointer; width: 100%; font-weight: bold; transition: background .2s; }
+    button#buildBtn:hover { background: #22863a; }
+    button#buildBtn:disabled { background: #94c9a3; cursor: not-allowed; }
+
+    #statusBox { margin-top: 20px; display: none; }
+
+    .step { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 8px; margin-bottom: 8px; background: #f8f8f8; border: 1px solid #eee; }
+    .step .icon { font-size: 20px; min-width: 28px; text-align: center; }
+    .step .label { font-size: 14px; color: #444; }
+    .step .sublabel { font-size: 12px; color: #888; margin-top: 2px; }
+    .step.active { background: #fffbe6; border-color: #f0c040; }
+    .step.done { background: #edfaf1; border-color: #84e0a3; }
+    .step.error { background: #fff0f0; border-color: #f0a0a0; }
+
+    .spinner { display: inline-block; width: 18px; height: 18px; border: 3px solid #ddd; border-top-color: #2ea44f; border-radius: 50%; animation: spin .8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    #downloadBtn { display: none; width: 100%; margin-top: 16px; padding: 14px; background: #0969da; color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; transition: background .2s; }
+    #downloadBtn:hover { background: #0550ae; }
+
+    #errorMsg { display: none; margin-top: 12px; padding: 12px 16px; background: #fff0f0; border: 1px solid #f0a0a0; border-radius: 8px; font-size: 13px; color: #c0392b; }
   </style>
 </head>
 <body>
+  <div class="card">
+    <h2>🚀 Convertir un site en APK Android</h2>
 
-  <h2>🚀 Convertir un site en APK Android</h2>
+    <label>🔑 Token GitHub</label>
+    <input type="password" id="ghToken" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" />
 
-  <label>🔑 Token GitHub</label>
-  <input type="password" id="ghToken" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" />
+    <label>🌐 URL du site à convertir</label>
+    <input type="url" id="siteUrl" placeholder="https://mon-site.com" />
 
-  <label>🌐 URL du site à convertir</label>
-  <input type="url" id="siteUrl" placeholder="https://mon-site.com" />
+    <button id="buildBtn" onclick="lancerBuild()">Générer l'APK</button>
 
-  <button onclick="lancerBuild()">Générer l'APK</button>
+    <div id="statusBox">
+      <div class="step" id="step1">
+        <div class="icon">📤</div>
+        <div><div class="label">Envoi du build à GitHub</div><div class="sublabel" id="sub1">En attente...</div></div>
+      </div>
+      <div class="step" id="step2">
+        <div class="icon">⚙️</div>
+        <div><div class="label">Compilation en cours</div><div class="sublabel" id="sub2">En attente du démarrage...</div></div>
+      </div>
+      <div class="step" id="step3">
+        <div class="icon">📦</div>
+        <div><div class="label">APK prêt</div><div class="sublabel" id="sub3">En attente...</div></div>
+      </div>
+    </div>
 
-  <div id="status"></div>
+    <button id="downloadBtn" onclick="telechargerAPK()">⬇️ Télécharger l'APK</button>
+    <div id="errorMsg"></div>
+  </div>
 
 <script>
+  const REPO = 'mikefri/Create_APK';
+  let token = '';
+  let runId = null;
+  let artifactId = null;
+  let pollInterval = null;
+
+  function setStep(id, state, sub) {
+    const el = document.getElementById(id);
+    el.className = 'step ' + state;
+    if (sub) document.getElementById('sub' + id.replace('step','')) .textContent = sub;
+    if (state === 'active') {
+      el.querySelector('.icon').innerHTML = '<div class="spinner"></div>';
+    } else if (state === 'done') {
+      el.querySelector('.icon').textContent = '✅';
+    } else if (state === 'error') {
+      el.querySelector('.icon').textContent = '❌';
+    }
+  }
+
+  function showError(msg) {
+    const el = document.getElementById('errorMsg');
+    el.textContent = msg;
+    el.style.display = 'block';
+    document.getElementById('buildBtn').disabled = false;
+    document.getElementById('buildBtn').textContent = 'Réessayer';
+    if (pollInterval) clearInterval(pollInterval);
+  }
+
   async function lancerBuild() {
-    const token = document.getElementById('ghToken').value.trim();
+    token = document.getElementById('ghToken').value.trim();
     const url = document.getElementById('siteUrl').value.trim();
 
-    if (!token) {
-      afficher('❌ Entre ton token GitHub', 'err');
-      return;
-    }
-    if (!url || !url.startsWith('http')) {
-      afficher('❌ Entre une URL valide (commence par https://)', 'err');
-      return;
-    }
+    if (!token) return showError('❌ Entre ton token GitHub');
+    if (!url || !url.startsWith('http')) return showError('❌ Entre une URL valide');
 
-    afficher('⏳ Envoi en cours...', 'ok');
+    document.getElementById('buildBtn').disabled = true;
+    document.getElementById('buildBtn').textContent = 'Build en cours...';
+    document.getElementById('statusBox').style.display = 'block';
+    document.getElementById('errorMsg').style.display = 'none';
+    document.getElementById('downloadBtn').style.display = 'none';
+    runId = null;
+    artifactId = null;
+
+    setStep('step1', 'active', 'Envoi en cours...');
 
     try {
-      const response = await fetch('https://api.github.com/repos/mikefri/Create_APK/dispatches', {
+      const res = await fetch(`https://api.github.com/repos/${REPO}/dispatches`, {
         method: 'POST',
         headers: {
           'Authorization': 'Bearer ' + token,
           'Accept': 'application/vnd.github.v3+json',
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          event_type: 'build-app',
-          client_payload: { url: url, name: 'MonApp' }
-        })
+        body: JSON.stringify({ event_type: 'build-app', client_payload: { url, name: 'MonApp' } })
       });
 
-      if (response.status === 204) {
-        afficher('✅ Build lancé ! Va sur GitHub > Actions pour suivre et télécharger ton APK.', 'ok');
-      } else {
-        afficher('❌ Erreur ' + response.status + ' — Token invalide ou mauvais username ?', 'err');
+      if (res.status !== 204) {
+        setStep('step1', 'error', 'Erreur ' + res.status);
+        return showError('❌ Token invalide ou repo introuvable (erreur ' + res.status + ')');
       }
-    } catch (e) {
-      afficher('❌ Erreur réseau : ' + e.message, 'err');
+
+      setStep('step1', 'done', 'Build déclenché avec succès');
+      setStep('step2', 'active', 'Recherche du workflow...');
+
+      // Attendre 8s puis commencer à chercher le run
+      await sleep(8000);
+      pollInterval = setInterval(pollBuild, 6000);
+
+    } catch(e) {
+      setStep('step1', 'error');
+      showError('❌ Erreur réseau : ' + e.message);
     }
   }
 
-  function afficher(msg, type) {
-    const s = document.getElementById('status');
-    s.textContent = msg;
-    s.className = type;
-    s.style.display = 'block';
-  }
-</script>
+  async function pollBuild() {
+    try {
+      // Chercher le run le plus récent
+      if (!runId) {
+        const res = await fetch(
+          `https://api.github.com/repos/${REPO}/actions/runs?event=repository_dispatch&per_page=5`,
+          { headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/vnd.github.v3+json' } }
+        );
+        const data = await res.json();
+        if (data.workflow_runs && data.workflow_runs.length > 0) {
+          runId = data.workflow_runs[0].id;
+          setStep('step2', 'active', `Run #${runId} trouvé, compilation...`);
+        } else {
+          setStep('step2', 'active', 'En attente du démarrage...');
+          return;
+        }
+      }
 
+      // Vérifier le statut du run
+      const res = await fetch(
+        `https://api.github.com/repos/${REPO}/actions/runs/${runId}`,
+        { headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/vnd.github.v3+json' } }
+      );
+      const run = await res.json();
+      const status = run.status;
+      const conclusion = run.conclusion;
+
+      if (status === 'in_progress' || status === 'queued') {
+        const elapsed = Math.round((Date.now() - new Date(run.created_at).getTime()) / 1000);
+        setStep('step2', 'active', `Compilation en cours... (${elapsed}s)`);
+        return;
+      }
+
+      if (status === 'completed') {
+        if (conclusion !== 'success') {
+          clearInterval(pollInterval);
+          setStep('step2', 'error', 'Build échoué (' + conclusion + ')');
+          setStep('step3', 'error', 'APK non généré');
+          return showError(`❌ Le build a échoué (${conclusion}). Vérifie les logs sur GitHub Actions.`);
+        }
+
+        setStep('step2', 'done', 'Compilation réussie !');
+        setStep('step3', 'active', 'Récupération de l\'APK...');
+
+        // Chercher l'artefact
+        const artRes = await fetch(
+          `https://api.github.com/repos/${REPO}/actions/runs/${runId}/artifacts`,
+          { headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/vnd.github.v3+json' } }
+        );
+        const artData = await artRes.json();
+
+        if (artData.artifacts && artData.artifacts.length > 0) {
+          artifactId = artData.artifacts[0].id;
+          clearInterval(pollInterval);
+          setStep('step3', 'done', 'APK prêt à télécharger !');
+          document.getElementById('downloadBtn').style.display = 'block';
+          document.getElementById('buildBtn').disabled = false;
+          document.getElementById('buildBtn').textContent = 'Générer un nouvel APK';
+        } else {
+          setStep('step3', 'error', 'Artefact introuvable');
+          showError('❌ Build terminé mais aucun APK trouvé dans les artefacts.');
+          clearInterval(pollInterval);
+        }
+      }
+    } catch(e) {
+      console.error('Erreur poll:', e);
+    }
+  }
+
+  async function telechargerAPK() {
+    if (!artifactId) return;
+    document.getElementById('downloadBtn').textContent = '⏳ Téléchargement en cours...';
+
+    try {
+      // L'API GitHub retourne un zip — on le télécharge via fetch avec le token
+      const res = await fetch(
+        `https://api.github.com/repos/${REPO}/actions/artifacts/${artifactId}/zip`,
+        { headers: { 'Authorization': 'Bearer ' + token } }
+      );
+
+      if (!res.ok) throw new Error('Erreur ' + res.status);
+
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = 'MonApp.apk.zip';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(blobUrl);
+      document.getElementById('downloadBtn').textContent = '⬇️ Télécharger l\'APK';
+    } catch(e) {
+      showError('❌ Erreur téléchargement : ' + e.message);
+      document.getElementById('downloadBtn').textContent = '⬇️ Télécharger l\'APK';
+    }
+  }
+
+  function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+</script>
 </body>
 </html>
