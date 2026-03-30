@@ -37,8 +37,8 @@ jobs:
           mkdir -p ~/.bubblewrap
           echo "{\"jdkPath\":\"$JAVA_HOME\",\"androidSdkPath\":\"$ANDROID_SDK_ROOT\"}" \
             > ~/.bubblewrap/config.json
+          cat ~/.bubblewrap/config.json
 
-      # ✅ NOUVEAU : Créer le keystore de signature
       - name: Create Keystore
         run: |
           keytool -genkey -v \
@@ -66,10 +66,10 @@ jobs:
           answers = [
             '\n', '\n', '\n', '\n', '\n', '\n', '\n', '\n', '\n', '\n',
             '\n', '\n', '\n', '\n',
-            'release.keystore\n',          # Key store location
-            'releasekey\n',                # Key name
-            'password123\n',              # Key store password
-            'password123\n',              # Confirm password
+            'release.keystore\n',
+            'releasekey\n',
+            'password123\n',
+            'password123\n',
             'Dev User\n',
             'Dev\n',
             'MyOrg\n',
@@ -77,7 +77,7 @@ jobs:
             'IDF\n',
             'FR\n',
             'yes\n',
-            'password123\n',              # Key password
+            'password123\n',
             'password123\n',
           ]
 
@@ -116,29 +116,52 @@ jobs:
           CLEAN_URL: ${{ github.event.client_payload.url }}
           BUBBLEWRAP_SKIP_UPDATE_CHECK: "true"
 
-      # ✅ CORRIGÉ : build SANS --skipSigning
+      - name: Patch twa-manifest.json with keystore passwords
+        run: |
+          echo "=== Fichiers présents ==="
+          ls -la
+          echo "=== Contenu twa-manifest.json ==="
+          cat twa-manifest.json
+
+          python3 << 'PYEOF'
+          import json, os
+
+          with open('twa-manifest.json', 'r') as f:
+              manifest = json.load(f)
+
+          manifest['signingKey']['storePassword'] = os.environ['KEYSTORE_PASSWORD']
+          manifest['signingKey']['keyPassword'] = os.environ['KEY_PASSWORD']
+
+          with open('twa-manifest.json', 'w') as f:
+              json.dump(manifest, f, indent=2)
+
+          print("✅ twa-manifest.json patché avec succès")
+          print(f"  storePassword: {'*' * len(os.environ['KEYSTORE_PASSWORD'])}")
+          print(f"  keyPassword:   {'*' * len(os.environ['KEY_PASSWORD'])}")
+          PYEOF
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+
       - name: Build APK
         run: bubblewrap build
         env:
           BUBBLEWRAP_SKIP_UPDATE_CHECK: "true"
 
-      # ✅ NOUVEAU : Fallback signing si l'APK n'est pas signé
-      - name: Sign APK (fallback)
+      - name: Sign APK (fallback si non signé)
         run: |
           APK=$(find . -name "*.apk" | head -1)
           if [ -z "$APK" ]; then
-            echo "Aucun APK trouvé"
+            echo "❌ Aucun APK trouvé"
             exit 1
           fi
+          echo "APK trouvé : $APK"
 
-          # Vérifier si déjà signé
           if $ANDROID_SDK_ROOT/build-tools/34.0.0/apksigner verify "$APK" 2>/dev/null; then
-            echo "APK déjà signé ✅"
+            echo "✅ APK déjà signé"
           else
-            echo "Signature de l'APK..."
-            # Zipalign d'abord
+            echo "⚠️ APK non signé, signature manuelle..."
             $ANDROID_SDK_ROOT/build-tools/34.0.0/zipalign -v 4 "$APK" apk-aligned.apk
-            # Signer
             $ANDROID_SDK_ROOT/build-tools/34.0.0/apksigner sign \
               --ks release.keystore \
               --ks-key-alias releasekey \
@@ -146,14 +169,13 @@ jobs:
               --key-pass pass:"${{ secrets.KEY_PASSWORD }}" \
               --out apk-signed.apk \
               apk-aligned.apk
-            echo "APK signé ✅"
+            echo "✅ APK signé manuellement"
           fi
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: apk-${{ github.run_id }}
-          path: |
-            **/*.apk
+          path: "**/*.apk"
           if-no-files-found: warn
           retention-days: 7
