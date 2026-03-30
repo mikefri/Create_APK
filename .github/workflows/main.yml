@@ -140,7 +140,7 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
 
       - name: Build APK
-        run: echo "Y" | bubblewrap build
+        run: printf "Y\n${{ secrets.KEYSTORE_PASSWORD }}\n${{ secrets.KEY_PASSWORD }}\n" | bubblewrap build
         env:
           BUBBLEWRAP_SKIP_UPDATE_CHECK: "true"
 
