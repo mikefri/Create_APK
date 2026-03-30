@@ -118,8 +118,6 @@ jobs:
 
       - name: Patch twa-manifest.json with keystore passwords
         run: |
-          echo "=== Fichiers présents ==="
-          ls -la
           echo "=== Contenu twa-manifest.json ==="
           cat twa-manifest.json
 
@@ -136,15 +134,13 @@ jobs:
               json.dump(manifest, f, indent=2)
 
           print("✅ twa-manifest.json patché avec succès")
-          print(f"  storePassword: {'*' * len(os.environ['KEYSTORE_PASSWORD'])}")
-          print(f"  keyPassword:   {'*' * len(os.environ['KEY_PASSWORD'])}")
           PYEOF
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
 
       - name: Build APK
-        run: bubblewrap build
+        run: echo "Y" | bubblewrap build
         env:
           BUBBLEWRAP_SKIP_UPDATE_CHECK: "true"
 
